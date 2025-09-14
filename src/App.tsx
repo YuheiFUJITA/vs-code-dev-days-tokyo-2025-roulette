@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Play, Upload, Trophy, Users } from "@phosphor-icons/react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Play, Upload, Trophy, Users, Confetti, Star } from "@phosphor-icons/react"
 import { toast } from 'sonner'
 
 interface Participant {
@@ -23,6 +24,8 @@ function App() {
   const [eligibleParticipants, setEligibleParticipants] = useState<Participant[]>([])
   const [winners, setWinners, deleteWinners] = useKV<Participant[]>('lottery-winners', [])
   const [isProcessing, setIsProcessing] = useState(false)
+  const [showWinnerDialog, setShowWinnerDialog] = useState(false)
+  const [currentWinner, setCurrentWinner] = useState<Participant | null>(null)
 
   const parseCSV = (text: string): Participant[] => {
     const lines = text.trim().split('\n')
@@ -90,7 +93,7 @@ function App() {
 
     setIsProcessing(true)
     
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise(resolve => setTimeout(resolve, 1500))
 
     const randomIndex = Math.floor(Math.random() * eligibleParticipants.length)
     const winner = eligibleParticipants[randomIndex]
@@ -100,8 +103,9 @@ function App() {
     const newEligible = eligibleParticipants.filter(p => p.username !== winner.username)
     setEligibleParticipants(newEligible)
 
+    setCurrentWinner(winner)
+    setShowWinnerDialog(true)
     setIsProcessing(false)
-    toast.success(`当選者が決定しました！`)
   }
 
   const resetLottery = () => {
@@ -216,6 +220,66 @@ function App() {
             </CardContent>
           </Card>
         )}
+
+        {/* 当選者発表ダイアログ */}
+        <Dialog open={showWinnerDialog} onOpenChange={setShowWinnerDialog}>
+          <DialogContent className="max-w-md mx-auto">
+            <div className="text-center space-y-6 py-6">
+              {/* 派手なアニメーション要素 */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-32 h-32 bg-gradient-to-r from-yellow-400 via-red-500 to-pink-500 rounded-full opacity-20 animate-pulse"></div>
+                </div>
+                <div className="relative flex items-center justify-center">
+                  <Trophy size={64} className="text-yellow-500 animate-bounce" />
+                </div>
+              </div>
+
+              {/* 当選発表 */}
+              <div className="space-y-4">
+                <h2 className="text-3xl font-bold text-foreground animate-pulse">
+                  🎉 当選者発表 🎉
+                </h2>
+                
+                {currentWinner && (
+                  <div className="space-y-3 p-6 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border-2 border-yellow-300">
+                    <div className="flex items-center justify-center gap-2">
+                      <Star size={24} className="text-yellow-500" />
+                      <Badge variant="destructive" className="text-lg px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500">
+                        第{(winners || []).length}回当選
+                      </Badge>
+                      <Star size={24} className="text-yellow-500" />
+                    </div>
+                    
+                    <div className="text-2xl font-bold text-foreground">
+                      {currentWinner.displayName || currentWinner.username}
+                    </div>
+                    
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <div>ユーザー名: {currentWinner.username}</div>
+                      <div>参加枠: {currentWinner.participantFrame}</div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-center gap-2 text-lg">
+                  <Confetti size={24} className="text-pink-500" />
+                  <span className="font-semibold text-foreground">おめでとうございます！</span>
+                  <Confetti size={24} className="text-pink-500" />
+                </div>
+              </div>
+
+              {/* 閉じるボタン */}
+              <Button 
+                onClick={() => setShowWinnerDialog(false)}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                size="lg"
+              >
+                閉じる
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {winners && winners.length > 0 && (
           <Card>
