@@ -230,10 +230,10 @@ function App() {
                       </Badge>
                       <div>
                         <div className="font-semibold text-lg">
-                          運営枠（{winner.username}）
+                          {winner.displayName || winner.username}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          表示名: {winner.displayName}
+                          ユーザー名: {winner.username} | 参加枠: {winner.participantFrame}
                         </div>
                       </div>
                     </div>
