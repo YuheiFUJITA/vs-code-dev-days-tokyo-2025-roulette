@@ -27,11 +27,34 @@ function App() {
   const [showWinnerDialog, setShowWinnerDialog] = useState(false)
   const [currentWinner, setCurrentWinner] = useState<Participant | null>(null)
 
+  // 改良されたCSV解析関数（引用符で囲まれた値を適切に処理）
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = []
+    let current = ''
+    let inQuotes = false
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      
+      if (char === '"') {
+        inQuotes = !inQuotes
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim())
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    
+    result.push(current.trim())
+    return result
+  }
+
   const parseCSV = (text: string): Participant[] => {
     const lines = text.trim().split('\n')
     if (lines.length < 2) return []
 
-    const headers = lines[0].split(',').map(h => h.trim())
+    const headers = parseCSVLine(lines[0]).map(h => h.trim().replace(/"/g, ''))
     const expectedHeaders = [
       '参加枠名', 'ユーザー名', '表示名', '利用開始日', 'コメント', 
       '参加ステータス', '出欠ステータス', '出席日時'
@@ -43,7 +66,7 @@ function App() {
 
     const data: Participant[] = []
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim())
+      const values = parseCSVLine(lines[i]).map(v => v.trim().replace(/"/g, ''))
       if (values.length >= expectedHeaders.length) {
         const participant: Participant = {
           participantFrame: values[headers.indexOf('参加枠名')] || '',
@@ -79,7 +102,24 @@ function App() {
       setParticipants(parsed)
       const eligible = filterEligibleParticipants(parsed)
       setEligibleParticipants(eligible)
-      toast.success(`CSVデータを読み込みました（対象者: ${eligible.length}名）`)
+      
+      // 参加枠名の統計を表示
+      const frameStats = parsed.reduce((acc, p) => {
+        acc[p.participantFrame] = (acc[p.participantFrame] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+      
+      const attendeesByFrame = parsed.filter(p => p.attendanceStatus === '出席').reduce((acc, p) => {
+        acc[p.participantFrame] = (acc[p.participantFrame] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+      
+      console.log('参加枠統計:', frameStats)
+      console.log('出席者の参加枠統計:', attendeesByFrame)
+      
+      toast.success(
+        `CSVデータを読み込みました（総参加者: ${parsed.length}名、抽選対象者: ${eligible.length}名）`
+      )
     } catch (error) {
       toast.error('CSVデータの解析に失敗しました: ' + (error as Error).message)
     }
@@ -183,15 +223,13 @@ function App() {
   const resetLottery = () => {
     // 当選者データを削除
     deleteWinners()
-    // 空の当選者リストで抽選対象者を再計算
-    const winnerUsernames = new Set<string>()
+    // 参加者データから抽選対象者を再計算（当選者なしの状態で）
     const resetEligible = participants.filter(p => 
       p.attendanceStatus === '出席' && 
-      p.participantFrame !== '運営枠' &&
-      !winnerUsernames.has(p.username)
+      p.participantFrame !== '運営枠'
     )
     setEligibleParticipants(resetEligible)
-    toast.success('抽選をリセットしました')
+    toast.success(`抽選をリセットしました（抽選対象者: ${resetEligible.length}名）`)
   }
 
   return (
@@ -227,37 +265,75 @@ function App() {
         </Card>
 
         {participants.length > 0 && (
-          <div className="grid md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Users size={20} className="text-muted-foreground" />
-                  <span className="font-semibold">総参加者数</span>
-                </div>
-                <div className="text-2xl font-bold text-primary">{participants.length}名</div>
-              </CardContent>
-            </Card>
+          <>
+            <div className="grid md:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Users size={20} className="text-muted-foreground" />
+                    <span className="font-semibold">総参加者数</span>
+                  </div>
+                  <div className="text-2xl font-bold text-primary">{participants.length}名</div>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Play size={20} className="text-muted-foreground" />
-                  <span className="font-semibold">抽選対象者</span>
-                </div>
-                <div className="text-2xl font-bold text-accent">{eligibleParticipants.length}名</div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Play size={20} className="text-muted-foreground" />
+                    <span className="font-semibold">抽選対象者</span>
+                  </div>
+                  <div className="text-2xl font-bold text-accent">{eligibleParticipants.length}名</div>
+                </CardContent>
+              </Card>
 
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Trophy size={20} className="text-muted-foreground" />
+                    <span className="font-semibold">当選者数</span>
+                  </div>
+                  <div className="text-2xl font-bold text-destructive">{(winners || []).length}名</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 参加枠別統計 */}
             <Card>
-              <CardContent className="p-4 text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Trophy size={20} className="text-muted-foreground" />
-                  <span className="font-semibold">当選者数</span>
+              <CardHeader>
+                <CardTitle>参加枠別統計</CardTitle>
+                <CardDescription>
+                  出席者の参加枠別内訳（抽選対象は「運営枠」以外の出席者）
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {(() => {
+                    const attendeesByFrame = participants
+                      .filter(p => p.attendanceStatus === '出席')
+                      .reduce((acc, p) => {
+                        acc[p.participantFrame] = (acc[p.participantFrame] || 0) + 1
+                        return acc
+                      }, {} as Record<string, number>)
+                    
+                    return Object.entries(attendeesByFrame).map(([frame, count]) => (
+                      <div key={frame} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <span className="font-medium">{frame}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={frame === '運営枠' ? 'secondary' : 'default'}>
+                            {count}名
+                          </Badge>
+                          {frame !== '運営枠' && (
+                            <span className="text-xs text-green-600">抽選対象</span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  })()}
                 </div>
-                <div className="text-2xl font-bold text-destructive">{(winners || []).length}名</div>
               </CardContent>
             </Card>
-          </div>
+          </>
         )}
 
         {eligibleParticipants.length > 0 && (
