@@ -85,6 +85,64 @@ function App() {
     }
   }
 
+  // Web Audio APIでドラムロール音を生成・再生
+  const playDrumroll = () => {
+    const audioContext = new AudioContext()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    
+    oscillator.type = 'sawtooth'
+    oscillator.frequency.setValueAtTime(80, audioContext.currentTime)
+    
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime)
+    gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1)
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 1.4)
+    
+    // ドラムロールのロール効果（高速繰り返し）
+    const now = audioContext.currentTime
+    for (let i = 0; i < 30; i++) {
+      const time = now + (i * 0.05)
+      gainNode.gain.setValueAtTime(0.3, time)
+      gainNode.gain.exponentialRampToValueAtTime(0.05, time + 0.04)
+    }
+    
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + 1.4)
+    
+    return audioContext
+  }
+
+  // ファンファーレ音を生成・再生
+  const playFanfare = () => {
+    const audioContext = new AudioContext()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    
+    oscillator.type = 'triangle'
+    
+    // ファンファーレメロディー
+    const notes = [523.25, 659.25, 783.99, 1046.50] // C5, E5, G5, C6
+    const duration = 0.3
+    
+    notes.forEach((freq, index) => {
+      const startTime = audioContext.currentTime + (index * duration)
+      oscillator.frequency.setValueAtTime(freq, startTime)
+      gainNode.gain.setValueAtTime(0.4, startTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration)
+    })
+    
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + (notes.length * duration))
+    
+    return audioContext
+  }
+
   const executeLottery = async () => {
     if (eligibleParticipants.length === 0) {
       toast.error('抽選対象者がいません')
@@ -92,6 +150,13 @@ function App() {
     }
 
     setIsProcessing(true)
+    
+    // ドラムロール音を再生
+    try {
+      playDrumroll()
+    } catch (error) {
+      console.warn('Audio playback failed:', error)
+    }
     
     await new Promise(resolve => setTimeout(resolve, 1500))
 
@@ -106,6 +171,13 @@ function App() {
     setCurrentWinner(winner)
     setShowWinnerDialog(true)
     setIsProcessing(false)
+    
+    // 結果発表時にファンファーレ音を再生
+    try {
+      setTimeout(() => playFanfare(), 200)
+    } catch (error) {
+      console.warn('Audio playback failed:', error)
+    }
   }
 
   const resetLottery = () => {
@@ -207,7 +279,14 @@ function App() {
                   className="flex-1"
                   size="lg"
                 >
-                  {isProcessing ? '抽選中...' : '抽選実行'}
+                  {isProcessing ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      <span>抽選中... 🥁</span>
+                    </div>
+                  ) : (
+                    '抽選実行'
+                  )}
                 </Button>
                 <Button 
                   onClick={resetLottery} 
