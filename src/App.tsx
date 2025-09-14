@@ -56,8 +56,7 @@ function App() {
 
     const headers = parseCSVLine(lines[0]).map(h => h.trim().replace(/"/g, ''))
     const expectedHeaders = [
-      '参加枠名', 'ユーザー名', '表示名', '利用開始日', 'コメント', 
-      '参加ステータス', '出欠ステータス', '出席日時'
+      '参加枠名', 'ユーザー名', '表示名', '参加ステータス', '出欠ステータス'
     ]
 
     if (!expectedHeaders.every(header => headers.includes(header))) {
@@ -252,7 +251,7 @@ function App() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Textarea
-              placeholder="参加枠名,ユーザー名,表示名,利用開始日,コメント,参加ステータス,出欠ステータス,出席日時,..."
+              placeholder="参加枠名,ユーザー名,表示名,参加ステータス,出欠ステータス"
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
               rows={6}
