@@ -105,8 +105,16 @@ function App() {
   }
 
   const resetLottery = () => {
+    // 当選者データを削除
     deleteWinners()
-    setEligibleParticipants(filterEligibleParticipants(participants))
+    // 空の当選者リストで抽選対象者を再計算
+    const winnerUsernames = new Set<string>()
+    const resetEligible = participants.filter(p => 
+      p.attendanceStatus === '出席' && 
+      p.participantFrame !== '運営枠' &&
+      !winnerUsernames.has(p.username)
+    )
+    setEligibleParticipants(resetEligible)
     toast.success('抽選をリセットしました')
   }
 
